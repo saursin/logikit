@@ -4,9 +4,7 @@
 ################################################################################
 import os
 
-def gen_flist(dirs, output_file, cwd='.', exts=[], ignoredirs=[], defines=[], include_dirs=[], recursive=False, sort=True, verbose=True):
-    includes = [f'+incdir+{d}' for d in include_dirs]
-    defines = [f'+define+{d}' for d in defines] 
+def gen_flist(dirs, output_file, cwd='.', exts=[], ignoredirs=[], recursive=False, sort=True, verbose=True):
     flist = []
     
     # expand dirs paths, remove duplicates
@@ -39,51 +37,110 @@ def gen_flist(dirs, output_file, cwd='.', exts=[], ignoredirs=[], defines=[], in
     if sort:
         flist.sort()
 
-    return includes + [''] + defines + [''] + flist
+    return flist
+
+
+def write_json(output_file, flist, topmodule=None, defines=[], incdirs=[], verbose=True):
+    import json
+    flist = {
+        "topmodule": topmodule,
+        "defines": defines,
+        "incdirs": incdirs,
+        "files": flist
+    }
+
+
+
+    with open(output_file, 'w') as f:
+        json.dump(flist, f, indent=4)
+
+
+def write_flist(output_file, flist, topmodule=None, defines=[], incdirs=[], verbose=True):
+    txt = '#'*80 + '\n'
+    txt += f"# File list for project\n"
+    txt += '#'*80 + '\n\n'
+    txt += f'# Include directories\n'
+    for d in incdirs:
+        txt += f'+incdir+{d}\n'
+    txt += '\n'
+    txt += f'# Preprocessor Defines\n'
+    for d in defines:
+        txt += f'+define+{d}\n'
+    txt += '\n'
+    txt += '# Files\n'
+    txt += '\n'.join(flist)
+
+    with open(output_file, 'w') as f:
+        f.write(txt)
+
+
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate file list for VLSI tools")
-    parser.add_argument("dir", help="Root directory of the project", nargs="+")
-    parser.add_argument("-i", "--ignore", help="Ignore directory", default="build", nargs="*")
-    parser.add_argument("-I", "--include", help="Specify include dirs for file list", nargs="*")
-    parser.add_argument("-D", "--define", help="Specify macros for file list", nargs="*")
+    parser.add_argument("dir", help="Root directories of the project", nargs="+")
+    parser.add_argument("-i", "--ignore", help="Ignore directory", action="append")
+    parser.add_argument("-I", "--include", help="Specify include dirs for file list", action="append")
+    parser.add_argument("-D", "--define", help="Specify macros for file list", action="append")
+    parser.add_argument("-t", "--topmodule", help="Top module name")
     parser.add_argument("-e", "--ext", help="File extension to search (comma separated)", default="v,sv")
     parser.add_argument("-C", "--change-dir", help="Change to directory before searching")
     parser.add_argument("-o", "--output", help="Output file name")
+    parser.add_argument("-f", "--output-format", help="Output format", default="flist", choices=["flist", "json"])
     parser.add_argument("-r", "--recursive", help="Recursive search", action="store_true")
     parser.add_argument("-s", "--sort", help="Sort the file list", action="store_true")
     parser.add_argument("-v", "--verbose", help="Verbose mode", action="store_true")
     args = parser.parse_args()
 
+    verbose     = args.verbose
+    incdirs     = args.include if args.include else []
+    ignoredirs  = args.ignore if args.ignore else []
+    defines     = args.define if args.define else []
+
     exts = args.ext.split(",")
     exts = [f".{ext}" for ext in exts]
 
-    incdirs = args.include if args.include else []
-    ignoredirs = args.ignore if args.ignore else []
-    defines = args.define if args.define else []
-
     if args.verbose:
-        print("Root        :", args.dir)
-        print("Output      :", args.output)
-        print("Include Dirs:", incdirs)
-        print("Ignore Dirs :", ignoredirs)
-        print("File Ext    :", exts)
-        print("Defines     :", defines)
+        print("Root dir     :", args.dir)
+        print("Include dirs :", incdirs)
+        print("Ignore dirs  :", ignoredirs)
+        print("Defines      :", defines)
+        print("File ext     :", exts)
+        print("Output file  :", args.output)
+        print("Output format:", args.output_format)
+        print("Change dir   :", args.change_dir)
 
-    flist = gen_flist(args.dir, args.output, cwd=args.change_dir, exts=exts, ignoredirs=ignoredirs, defines=defines, 
-                      include_dirs=incdirs, recursive=args.recursive, sort=args.sort, verbose=args.verbose)
+    # check if dirs exist
+    def check_dir(dirs):
+        for d in dirs:
+            if not os.path.isdir(d):
+                print(f"Error: Directory not found: {d}")
+                exit(1)
+    
+    check_dir(args.dir)
+    check_dir(incdirs)
+    
+    # convert to rel paths
+    if args.change_dir != '.':
+        incdirs = [os.path.relpath(f, args.change_dir) for f in incdirs]
+
+    flist = gen_flist(args.dir, args.output, cwd=args.change_dir, exts=exts, ignoredirs=ignoredirs, recursive=args.recursive, sort=args.sort, verbose=args.verbose)
 
     nfiles = len(flist)
     print(f"Found {nfiles} files")
 
-    if args.output:
-        print(f"Writing file: {args.output}")
-        with open(args.output, 'w') as f:
-            f.write('#'*80 + '\n')
-            f.write(f"# File list for project in {args.dir}\n")
-            f.write('#'*80 + '\n')
-            f.write('\n'.join(flist))
+    output = args.output
+    if not output:
+        if args.output_format == "json":
+            output = "proj.json"
+        else:
+            output = "proj.f"
+
+    if args.verbose:
+        print('Writing to file:', output)
+
+    if args.output_format == "json":
+        write_json(output, flist, topmodule=args.topmodule, defines=defines, incdirs=incdirs, verbose=args.verbose)
     else:
-        print('\n'.join(flist))
+        write_flist(output, flist, topmodule=args.topmodule, defines=defines, incdirs=incdirs, verbose=args.verbose)
