@@ -1,0 +1,3 @@
+HWTOOLS_ROOT=$(dirname -- "$(readlink -f "${BASH_SOURCE}")")
+
+alias genflist="python3 ${HWTOOLS_ROOT}/tools/misc/genflist.py"
