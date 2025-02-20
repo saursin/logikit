@@ -1,0 +1,1 @@
+`define UNUSED_VAR(x) always @(x) begin end

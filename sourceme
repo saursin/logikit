@@ -1,4 +1,4 @@
-HWTOOLS_ROOT=$(dirname -- "$(readlink -f "${BASH_SOURCE}")")
+export HWTOOLS_ROOT=$(dirname -- "$(readlink -f "${BASH_SOURCE}")")
 
 alias genflist="python3 ${HWTOOLS_ROOT}/tools/misc/genflist.py"
-alias hierarchy_explorer="python3 ${HWTOOLS_ROOT}/tools/misc/hierarchy_explorer.py"
+alias hierviz="python3 ${HWTOOLS_ROOT}/tools/misc/hierviz.py"

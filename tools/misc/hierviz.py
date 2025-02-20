@@ -1,0 +1,192 @@
+import os, sys
+import xml.etree.ElementTree as ET
+
+# Add lib/tool_utils to sys.path
+HWTOOLS_ROOT = os.getenv('HWTOOLS_ROOT', None)
+if HWTOOLS_ROOT is None:
+    print('Error: Environment variable HWTOOLS_ROOT not set')
+    sys.exit(1)
+sys.path.append(f'{HWTOOLS_ROOT}/lib/tool_utils')
+from print_utils import print_tree
+
+
+def gen_hierarcy_xml(flist=None, vfiles=[], incdirs=[], defines=[], topmodule=None, xml_file='hierarchy.xml'):
+    if flist is None and len(vfiles) == 0:
+        print('Error no filelist or verilog/SystemVerilog files provided')
+        sys.exit(1)
+    
+    cmd = f'verilator --xml-only --xml-output {xml_file}'
+
+    if flist is not None:
+        # Use JSON file list
+        if flist.endswith('.json') or flist.endswith('.json5'):
+            json_contents = {}
+            try:
+                with open(flist, 'r') as f:
+                    json_contents = json.load(f)
+            except:
+                print(f'Error reading json file {flist}')
+                sys.exit(1)
+            if 'topmodule' in json_contents and json_contents['topmodule'] is not None:
+                cmd += f' --top-module {json_contents["topmodule"]}'
+            for d in json_contents['incdirs']:
+                cmd += f' -I{d}'
+            for d in json_contents['defines']:
+                cmd += f' -D{d}'
+            for f in json_contents['files']:
+                cmd += f' {f}'
+        else: # .f: Use text file list
+            cmd += f' -f {flist}'
+
+    if topmodule is not None:
+        cmd += f' --top-module {topmodule}'
+    for d in incdirs:
+        cmd += f' -I{d}'
+    for d in defines:
+        cmd += f' -D{d}'
+    for f in vfiles:
+        cmd += f' {f}'
+
+    if os.path.exists(xml_file):
+        os.remove(xml_file)
+    os.system(cmd)
+
+
+class Port:
+    def __init__(self, name, direction, width=1, lo=1):
+        self.name = name
+        self.direction = direction
+        self.width = width
+        self.lo = lo
+    
+    def __str__(self):
+        return f'{self.direction} {self.name}' + (f'[{self.lo+self.width-1}:{self.lo}]' if self.width > 1 else '')
+
+
+class Module:
+    def __init__(self, name):
+        self.name = name
+        self.submodname = None
+        self.instances = []
+        self.ports = []
+        self.location = None
+    
+    def add_instance(self, instance):
+        self.instances.append(instance)
+
+    def add_port(self, port):
+        # Check if port name already exists
+        for p in self.ports:
+            if p.name == port.name:
+                raise ValueError(f'Port name {port.name} already exists in module {self.name}')
+        self.ports.append(port)
+
+    def __str__(self):
+        return f'{self.submodname+" " if self.submodname is not None else ""}({self.name})'
+    
+
+class HierarchyVisualizer:
+    def __init__(self):
+        self.top = None
+        self.files = {}
+        self.xml = None
+
+    def read_xml(self, xml_file):
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+
+        def __parse_hierarchy(cell_element):
+            m = Module(cell_element.get("name"))
+            m.submodname = cell_element.get("submodname")
+            m.location = cell_element.get("file")
+            for child in cell_element.findall("cell"):
+                m.add_instance(__parse_hierarchy(child))
+            return m
+            
+        hierarchy_list = []
+        for cell in root.findall(".//cell"):
+            if '.' not in cell.get("hier", ""):
+                hierarchy_list.append(__parse_hierarchy(cell))
+        self.top = hierarchy_list
+
+
+    def print(self, max_depth=None):
+        def getchild_callback(node):
+            return node.instances
+        def print_callback(node, depth):
+            name_str = f'\033[1;34m{node.name}\033[0m'
+            submodname_str = f'\033[1;32m({node.submodname})\033[0m' if node.submodname else ''
+            return f'{name_str} {submodname_str}'
+        print_tree(self.top, getchild_callback, print_callback, max_depth=max_depth)
+
+    def export_dot(self, max_depth=None):
+        dot_lines = ['digraph G {', '    rankdir=TB;']
+        dot_lines.append('    node [shape=box, style=filled, fillcolor=lightblue];')
+        dot_lines.append('    edge [color=black];')
+
+        def __parse_hierarchy(node, dot_lines, parent=None, depth=0):
+            node_id = node.name
+            label = f'{node.name}\\n({node.submodname})'
+            dot_lines.append(f'    "{node_id}" [label="{label}"];')
+            if parent:
+                dot_lines.append(f'    "{parent}" -> "{node_id}";')
+            if max_depth == -1 or depth < max_depth:
+                for child in node.instances:
+                    __parse_hierarchy(child, dot_lines, parent=node_id, depth=depth+1)
+
+        for root in self.top:
+            __parse_hierarchy(root, dot_lines)
+
+        dot_lines.append('}')
+        return dot_lines
+        
+
+if __name__ == '__main__':
+    import argparse
+    import json
+    parser = argparse.ArgumentParser(description='Visualize hierarchy of a design')
+    parser.add_argument('file', help='Verilog/SystemVerilog files', nargs='*', default=[])
+    parser.add_argument("-I", "--include", help="Specify include dirs for file list", action="append", default=[])
+    parser.add_argument("-D", "--define", help="Specify macros for file list", action="append", default=[])
+    parser.add_argument("-t", "--topmodule", help="Top module name")
+    parser.add_argument('-f', '--file-list', help='Use specified JSON/txt file list', default=None)
+    parser.add_argument('--dot', help='Write a dot file', type=str)
+    parser.add_argument('-d', '--max-depth', help='Maximum depth to print', type=int, default=-1)
+    parser.add_argument('--xml-file', help='XML file to write hierarchy', default='/tmp/hierarchy.xml')
+    args = parser.parse_args()
+    
+    for f in args.file:
+        if not os.path.isfile(f):
+            print(f'Error: File {f} not found')
+            sys.exit(1)
+        ext = os.path.splitext(f)[1]
+        if ext in ['.json', '.f']:
+            if args.file_list is not None:
+                print('Error: file list should be specified using -f <[proj.json/proj.f>')
+                sys.exit(1)
+        if ext not in ['.v', '.vh', '.sv', '.svh']:
+            print(f'Error: Unsupported file extension {ext}: {f}')
+            sys.exit(1)
+
+    # TODO: Switch to JSON output in using newer version of verilator
+    gen_hierarcy_xml(flist=args.file_list, vfiles=args.file, incdirs=args.include, defines=args.define, topmodule=args.topmodule, xml_file=args.xml_file)
+
+    if not os.path.exists(args.xml_file):
+        print(f'Error: Failed to generate XML file: {args.xml_file}')
+        sys.exit(1)
+
+    # Parse the hierarchy xml
+    hier = HierarchyVisualizer()
+    hier.read_xml(args.xml_file)
+    
+    if args.dot:
+        dot = hier.export_dot(max_depth=args.max_depth)
+        try:
+            with open(args.dot, 'w') as f:
+                f.write('\n'.join(dot))
+            print(f'Dot file written to {args.dot}')
+        except:
+            print(f'Error writing dot file to {args.dot}')
+        
+    else:
+        hier.print(max_depth=args.max_depth)
