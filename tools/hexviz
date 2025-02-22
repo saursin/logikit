@@ -1,0 +1,41 @@
+import sys
+from rich.console import Console
+from rich.table import Table
+from rich.prompt import Prompt
+import argparse
+
+def read_bin_file(filename, chunk_size=16):
+    with open(filename, 'rb') as f:
+        while chunk := f.read(chunk_size):
+            yield chunk
+
+def format_hex(data, word_size=1):
+    return ' '.join(f'{int.from_bytes(data[i:i+word_size], byteorder="big"):0{word_size*2}x}' for i in range(0, len(data), word_size))
+
+def format_ascii(data):
+    return ''.join(chr(byte) if 32 <= byte <= 126 else '.' for byte in data)
+
+def visualize_bin_file(filename, word_size=1):
+    console = Console()
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Offset", style="dim", width=8)
+    table.add_column("Hex", style="bold")
+    table.add_column("ASCII", style="bold")
+
+    offset = 0
+    for chunk in read_bin_file(filename, chunk_size=16):
+        hex_data = format_hex(chunk, word_size)
+        ascii_data = format_ascii(chunk)
+        table.add_row(f'{offset:08x}', hex_data, ascii_data)
+        offset += len(chunk)
+
+    console.print(table)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Visualize binary files in hex and ASCII format.")
+    parser.add_argument('filename', help='Binary file to visualize')
+    parser.add_argument('-i', '--interactive', action='store_true', help='Enable interactive mode')
+    parser.add_argument('-w', '--word', type=int, default=1, help='Group bytes into words of this size')
+    args = parser.parse_args()
+
+    visualize_bin_file(args.filename, args.word)
