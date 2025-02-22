@@ -1,4 +1,2 @@
 export HWTOOLS_ROOT=$(dirname -- "$(readlink -f "${BASH_SOURCE}")")
-
-alias genflist="python3 ${HWTOOLS_ROOT}/tools/misc/genflist.py"
-alias hierviz="python3 ${HWTOOLS_ROOT}/tools/misc/hierviz.py"
+export PATH="${HWTOOLS_ROOT}/tools:$PATH"

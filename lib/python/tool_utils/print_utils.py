@@ -23,3 +23,16 @@ def print_tree(tree, getchild_callback, print_callback, max_depth=-1, prefix="",
 
     for i, root in enumerate(tree):
         __print_hierarchy_recursive(root, prefix, i == len(tree) - 1)
+
+
+def simple_progress_bar(progress, bar_length=40):
+    '''
+    Returns a simple progress bar string
+    '''
+    fill_char = "▇"
+    empty_char = " "
+    block = int(round(bar_length * progress / 100))
+    color_start = "\033[92m"  # Green color
+    color_end = "\033[0m"     # Reset color
+    colored_progress_bar = f"{color_start}{fill_char * block}{color_end}{empty_char * (bar_length - block)}"
+    return f"|{colored_progress_bar}| {progress:.2f}%"

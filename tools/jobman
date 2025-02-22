@@ -1,0 +1,34 @@
+#! /usr/bin/env python3
+################################################################################
+# A simple job manager to run a batch of commands concurrently
+# Usage: python jobman.py <file> -j <num_jobs>
+# The file should contain a list of commands to run
+################################################################################
+import sys, os
+import argparse
+
+HWTOOLS_ROOT = os.getenv('HWTOOLS_ROOT', None)
+if HWTOOLS_ROOT is None:
+    print('Error: Environment variable HWTOOLS_ROOT not set')
+    sys.exit(1)
+sys.path.append(f'{HWTOOLS_ROOT}/lib/python')
+from jobman import JobManager, Job
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run a batch of jobs')
+    parser.add_argument('file', help='File containing the list of commands')
+    parser.add_argument('-j', '--jobs', type=int, default=4, help='Number of jobs to run concurrently')
+    parser.add_argument('-n', '--num-jobs', type=int, default=None, help='Number of jobs to run from file')
+    parser.add_argument('--dry-run', action='store_true', help='Dry run mode', default=False)
+    args = parser.parse_args()
+
+    manager = JobManager(max_workers=args.jobs)
+    with open(args.file, 'r') as f:
+        for i, line in enumerate(f):
+            if args.num_jobs and i >= args.num_jobs:
+                break
+            job = Job(f"job{i}", line.strip())
+            manager.add_job(job)
+
+    manager.run(dry_run=args.dry_run)
