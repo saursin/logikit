@@ -6,7 +6,7 @@ set filelist_file ""
 set top_module ""
 set output_dir "yosys_build"
 set flatten 0
-set liberty "$env(HWTOOLS_ROOT)/lib/asic/metacells.lib"
+set liberty "$env(LOGIKIT_ROOT)/lib/asic/metacells.lib"
 set clk_period 10
 set default_synth 1
 set build_dir "yosys_build"
@@ -94,7 +94,7 @@ file mkdir $output_dir
 file mkdir $report_dir
 
 # Source the utils.tcl file to use the get_verilog_sources function
-source $env(HWTOOLS_ROOT)/scripts/common/utils.tcl
+source $env(LOGIKIT_ROOT)/scripts/common/utils.tcl
 
 # Read the file list and get Verilog and SystemVerilog sources
 set verilog_sources [get_verilog_sources $filelist_file]

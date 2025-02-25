@@ -6,11 +6,11 @@ import os, sys
 import xml.etree.ElementTree as ET
 
 # Add lib/tool_utils to sys.path
-HWTOOLS_ROOT = os.getenv('HWTOOLS_ROOT', None)
-if HWTOOLS_ROOT is None:
-    print('Error: Environment variable HWTOOLS_ROOT not set')
+LOGIKIT_ROOT = os.getenv('LOGIKIT_ROOT', None)
+if LOGIKIT_ROOT is None:
+    print('Error: Environment variable LOGIKIT_ROOT not set')
     sys.exit(1)
-sys.path.append(f'{HWTOOLS_ROOT}/lib/python')
+sys.path.append(f'{LOGIKIT_ROOT}/lib/python')
 from tool_utils import print_tree
 
 

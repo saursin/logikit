@@ -89,7 +89,7 @@ file mkdir $output_dir
 file mkdir $report_dir
 
 # Source the utils.tcl file to use the get_verilog_sources function
-source $env(HWTOOLS_ROOT)/scripts/common/utils.tcl
+source $env(LOGIKIT_ROOT)/scripts/common/utils.tcl
 
 # Read the file list and get Verilog and SystemVerilog sources
 set verilog_sources [get_verilog_sources $filelist_file]

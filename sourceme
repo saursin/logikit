@@ -1,2 +1,2 @@
-export HWTOOLS_ROOT=$(dirname -- "$(readlink -f "${BASH_SOURCE}")")
-export PATH="${HWTOOLS_ROOT}/tools:$PATH"
+export LOGIKIT_ROOT=$(dirname -- "$(readlink -f "${BASH_SOURCE}")")
+export PATH="${LOGIKIT_ROOT}/tools:$PATH"
